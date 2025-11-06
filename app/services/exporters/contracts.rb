@@ -19,7 +19,7 @@ class Exporters::Contracts
   def call
     CSV.generate(encoding: "utf-8") do |csv|
       csv << FIELD_NAMES
-      query.each do |record|
+      contract_templates.each do |record|
         csv << FIELD_NAMES.map { |field| attribute(field, record) }
       end
     end
@@ -38,18 +38,32 @@ private
     end
   end
 
-  def query
-    ContractTemplate
+  def contract_templates
+    statements_lead_provider_courses = Statement
       .joins(contracts: [{ statement: :lead_provider }, :course])
-      .where(statements: { cohort: })
-      .select(
-        "lead_providers.name as lead_provider_name",
-        "courses.identifier as course_identifier",
-        :recruitment_target,
-        :per_participant,
-        :service_fee_installments,
-        :special_course,
-        :monthly_service_fee,
-      ).distinct
+      .where(cohort:, output_fee: true)
+      .group(:lead_provider_id, :course_id)
+      .order(:lead_provider_id, :course_id)
+      .count
+
+    statements_lead_provider_courses.map do |values|
+      lead_provider_id, course_id = values[0]
+
+      ContractTemplate
+        .joins(contracts: [{ statement: :lead_provider }, :course])
+        .where(statements: { lead_provider_id: }, contracts: { course_id: })
+        .where("MAKE_DATE(statements.year, statements.month, 1) <= DATE_TRUNC('month', CURRENT_DATE)")
+        .order("statements.year desc", "statements.month desc")
+        .limit(1)
+        .select(
+          "lead_providers.name as lead_provider_name",
+          "courses.identifier as course_identifier",
+          :recruitment_target,
+          :per_participant,
+          :service_fee_installments,
+          :special_course,
+          :monthly_service_fee,
+        ).first
+    end
   end
 end
