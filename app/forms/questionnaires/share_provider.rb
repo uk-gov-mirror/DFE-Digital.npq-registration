@@ -26,12 +26,12 @@ module Questionnaires
       ]
     end
 
-    def next_step
-      check_answers_step
-    end
-
     def previous_step
       :choose_your_provider
+    end
+
+    def next_step
+      check_answers_step
     end
   end
 end
